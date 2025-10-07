@@ -44,32 +44,50 @@ if st.sidebar.button("🔴 Detener Riego"):
 
 if st.sidebar.button("📸 Capturar y Clasificar"):
     # Captura
-    ruta = capture_image(output_path="../imagenes/ultima.jpg")
+    ruta = capture_image(output_path=IMAGE_PATH)
     st.sidebar.write(f"Imagen capturada: {os.path.basename(ruta)}")
+
     # Clasificación
     img_array = preprocess_image(IMAGE_PATH, input_shape)
     output    = predict(interpreter, img_array)[0]
     etiqueta  = labels[int(pd.np.argmax(output))]
+
     # Guardar etiqueta en CSV (actualiza la última fila)
-    df = pd.read_csv(CSV_PATH)
-    df.loc[df.index[-1], "Estado visual"] = etiqueta
-    df.to_csv(CSV_PATH, index=False)
-    st.sidebar.success(f"Clasificación: {etiqueta}")
+    try:
+        df = pd.read_csv(CSV_PATH)
+    except FileNotFoundError:
+        st.warning("⚠ No se encontró el historial de riego.")
+        df = pd.DataFrame(columns=["Fecha y Hora", "Humedad (raw)", "Válvula", "Estado visual"])
+
+    if not df.empty:
+        df.loc[df.index[-1], "Estado visual"] = etiqueta
+        df.to_csv(CSV_PATH, index=False)
+        st.sidebar.success(f"Clasificación: {etiqueta}")
+    else:
+        st.sidebar.warning("No hay datos para clasificar.")
 
 if st.sidebar.button("🔄 Refrescar Datos"):
     st.experimental_rerun()
 
 # Cargo CSV
-df = pd.read_csv(CSV_PATH)
+try:
+    df = pd.read_csv(CSV_PATH)
+except FileNotFoundError:
+    st.warning("⚠ No se encontró el historial de riego.")
+    df = pd.DataFrame(columns=["Fecha y Hora", "Humedad (raw)", "Válvula", "Estado visual"])
 
 # Estado actual (última fila)
-ultimo = df.iloc[-1]
-st.subheader("📈 Estado Actual")
-st.write(f"- Fecha y Hora: **{ultimo['Fecha y Hora']}**")
-st.write(f"- Humedad (raw): **{ultimo['Humedad (raw)']}**")
-st.write(f"- Válvula: **{ultimo['Válvula']}**")
-if "Estado visual" in df.columns:
-    st.write(f"- Estado visual: **{ultimo['Estado visual']}**")
+if not df.empty:
+    ultimo = df.iloc[-1]
+    st.subheader("📈 Estado Actual")
+    st.write(f"- Fecha y Hora: **{ultimo['Fecha y Hora']}**")
+    st.write(f"- Humedad (raw): **{ultimo['Humedad (raw)']}**")
+    st.write(f"- Válvula: **{ultimo['Válvula']}**")
+    if "Estado visual" in df.columns:
+        st.write(f"- Estado visual: **{ultimo['Estado visual']}**")
+else:
+    st.subheader("📈 Estado Actual")
+    st.warning("No hay datos registrados aún.")
 
 # Mostrar última imagen
 st.subheader("📷 Última Imagen Capturada")
@@ -85,4 +103,3 @@ st.dataframe(df)
 # Footer
 st.markdown("---")
 st.markdown("**Nota:** Usa los botones de la barra lateral para controlar el sistema o capturar nuevas imágenes.")
-
